@@ -10,6 +10,19 @@
 (function () {
     'use strict';
 
+    // ===== DEBUG =====
+    console.log('🟢 Tampermonkey script started!');
+    console.log('📍 URL:', window.location.href);
+    console.log('🕐 Time:', new Date().toISOString());
+    
+    // Kiểm tra xem script đã chạy chưa
+    if (window.__TAMPERMONKEY_RUNNING) {
+        console.log('⚠️ Script already running, skipping...');
+        return;
+    }
+    window.__TAMPERMONKEY_RUNNING = true;
+    // ===== END DEBUG =====
+
     const BANK_ID = 'MB';
     const BANK_NAME = 'MBBANK NGÂN HÀNG QUÂN ĐỘI';
     const ACCOUNT_NO = '757526789';
@@ -148,6 +161,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fff8f0;
 </div>
 
 <script>
+  console.log('🟢 Deposit page loaded!');
+  
   // QR
   const qrImg = document.getElementById('qrImg');
   const qrLoading = document.getElementById('qrLoading');
@@ -246,28 +261,57 @@ body{font-family:-apple-system,BlinkMacSystemFont,sans-serif;background:#fff8f0;
     }
 
     function findAndPatch() {
+        console.log('🔍 Searching for deposit button...');
         const btn = document.getElementById('depositSubmitClick');
-        if (btn && !patched.has(btn)) { patchButton(btn); return; }
+        if (btn && !patched.has(btn)) { 
+            console.log('✅ Found depositSubmitClick button');
+            patchButton(btn); 
+            return; 
+        }
         document.querySelectorAll('button.ui-button,button').forEach(el => {
             if (patched.has(el)) return;
             const t = el.innerText || el.textContent || '';
-            if (t.trim().includes('Nạp Tiền Ngay')) patchButton(el);
+            if (t.trim().includes('Nạp Tiền Ngay')) {
+                console.log('✅ Found "Nạp Tiền Ngay" button');
+                patchButton(el);
+            }
         });
     }
 
+    // Override history để patch lại khi trang thay đổi
     const _push = history.pushState;
-    history.pushState = function(...a){ _push.apply(history,a); setTimeout(findAndPatch,300); setTimeout(findAndPatch,800); setTimeout(findAndPatch,1500); };
+    history.pushState = function(...a){ 
+        _push.apply(history,a); 
+        setTimeout(findAndPatch,300); 
+        setTimeout(findAndPatch,800); 
+        setTimeout(findAndPatch,1500); 
+    };
     const _replace = history.replaceState;
-    history.replaceState = function(...a){ _replace.apply(history,a); setTimeout(findAndPatch,300); };
-    window.addEventListener('popstate', ()=>{ setTimeout(findAndPatch,300); setTimeout(findAndPatch,800); });
+    history.replaceState = function(...a){ 
+        _replace.apply(history,a); 
+        setTimeout(findAndPatch,300); 
+    };
+    window.addEventListener('popstate', ()=>{ 
+        setTimeout(findAndPatch,300); 
+        setTimeout(findAndPatch,800); 
+    });
 
+    // Khởi tạo
+    console.log('🚀 Initializing Tampermonkey script...');
     findAndPatch();
     document.addEventListener('DOMContentLoaded', findAndPatch);
-    window.addEventListener('load', findAndPatch);
+    window.addEventListener('load', function() {
+        console.log('📄 Window loaded');
+        findAndPatch();
+    });
+    
+    // Kiểm tra liên tục
     setInterval(findAndPatch, 1000);
 
+    // MutationObserver
     new MutationObserver(ms=>{
         if(ms.some(m=>m.addedNodes.length>0)) findAndPatch();
     }).observe(document.documentElement||document.body, {childList:true, subtree:true});
 
+    console.log('✅ Tampermonkey script initialized successfully!');
 })();
