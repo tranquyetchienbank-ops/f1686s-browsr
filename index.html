@@ -15,22 +15,21 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            background: #ffffff;
+            background: #f0f0f0;
         }
         
-        #browser-container {
+        #container {
             width: 100%;
             height: 100vh;
             height: 100dvh;
             position: relative;
-            overflow: hidden;
         }
         
-        #page-frame {
+        #content {
             width: 100%;
             height: 100%;
-            border: none;
-            display: block;
+            overflow: auto;
+            -webkit-overflow-scrolling: touch;
         }
         
         .loading {
@@ -72,117 +71,108 @@
             color: #333;
             font-size: 16px;
         }
+        
+        .loading-sub {
+            margin-top: 8px;
+            color: #888;
+            font-size: 13px;
+        }
+        
+        /* Ẩn scrollbar */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+        * {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
     </style>
 </head>
 <body>
-    <div id="browser-container">
-        <!-- Sử dụng iframe để hiển thị trang -->
-        <iframe id="page-frame" sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"></iframe>
+    <div id="container">
+        <div id="content"></div>
     </div>
     
     <div class="loading" id="loading">
         <div class="spinner"></div>
-        <div class="loading-text">Đang tải...</div>
+        <div class="loading-text">Đang tải trình duyệt...</div>
+        <div class="loading-sub">Đang khởi tạo Tampermonkey script</div>
     </div>
 
     <script>
         (function() {
             'use strict';
             
-            const iframe = document.getElementById('page-frame');
+            const content = document.getElementById('content');
             const loading = document.getElementById('loading');
-            const TARGET_URL = 'https://f1686s.com';
+            const PROXY_URL = '/load';
             
-            // Đọc Tampermonkey script từ server
-            async function loadTampermonkeyScript() {
-                try {
-                    const response = await fetch('/tampermonkey-script.js?' + Date.now());
-                    const scriptText = await response.text();
-                    return scriptText;
-                } catch (error) {
-                    console.error('Failed to load Tampermonkey script:', error);
-                    return null;
-                }
-            }
+            console.log('🚀 Cloud Browser starting...');
             
-            // Inject script vào iframe
-            function injectScriptToIframe(scriptText) {
+            // Tải trang qua proxy
+            async function loadPage() {
                 try {
-                    const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
-                    if (!iframeDoc) {
-                        console.log('Cannot access iframe document');
-                        return false;
+                    console.log('🔄 Fetching page via proxy...');
+                    const response = await fetch(PROXY_URL);
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
                     }
                     
-                    // Tạo script element
-                    const script = iframeDoc.createElement('script');
-                    script.textContent = scriptText;
-                    script.setAttribute('data-tampermonkey', 'true');
+                    const html = await response.text();
+                    console.log('✅ Page loaded, length:', html.length);
                     
-                    // Thêm vào head
-                    if (iframeDoc.head) {
-                        iframeDoc.head.appendChild(script);
-                        console.log('✅ Tampermonkey script injected successfully');
-                        return true;
-                    } else {
-                        console.log('No head element in iframe');
-                        return false;
-                    }
-                } catch (error) {
-                    console.error('Error injecting script:', error);
-                    return false;
-                }
-            }
-            
-            // Hàm chính để khởi tạo
-            async function initBrowser() {
-                // Load script
-                const scriptText = await loadTampermonkeyScript();
-                if (!scriptText) {
-                    console.error('Cannot load Tampermonkey script');
-                }
-                
-                // Load trang web
-                iframe.src = TARGET_URL;
-                
-                // Khi iframe load xong
-                iframe.addEventListener('load', function() {
-                    console.log('Page loaded');
+                    // Hiển thị HTML
+                    content.innerHTML = html;
                     
                     // Ẩn loading
                     loading.classList.add('hidden');
                     
-                    // Inject script sau khi load
-                    if (scriptText) {
-                        // Thử inject nhiều lần
-                        setTimeout(() => {
-                            injectScriptToIframe(scriptText);
-                        }, 500);
-                        
-                        setTimeout(() => {
-                            injectScriptToIframe(scriptText);
-                        }, 1500);
-                        
-                        setTimeout(() => {
-                            injectScriptToIframe(scriptText);
-                        }, 3000);
-                    }
-                });
-                
-                // Timeout để ẩn loading
-                setTimeout(() => {
+                    // Kiểm tra script đã chạy chưa
+                    setTimeout(() => {
+                        const iframe = document.querySelector('iframe');
+                        if (iframe) {
+                            console.log('📄 Iframe detected');
+                            try {
+                                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                                if (iframeDoc) {
+                                    console.log('✅ Can access iframe document');
+                                }
+                            } catch (e) {
+                                console.log('⚠️ Cannot access iframe (cross-origin)');
+                            }
+                        }
+                    }, 2000);
+                    
+                } catch (error) {
+                    console.error('❌ Failed to load page:', error);
+                    content.innerHTML = `
+                        <div style="padding:50px;text-align:center;font-family:sans-serif;">
+                            <h2>⚠️ Không thể tải trang</h2>
+                            <p style="color:#666;">${error.message}</p>
+                            <button onclick="location.reload()" style="margin-top:20px;padding:10px 30px;background:#f5a623;border:none;border-radius:5px;color:#fff;font-size:16px;cursor:pointer;">
+                                Thử lại
+                            </button>
+                        </div>
+                    `;
                     loading.classList.add('hidden');
-                }, 8000);
+                }
             }
             
             // Khởi tạo
             if (document.readyState === 'complete') {
-                initBrowser();
+                loadPage();
             } else {
-                window.addEventListener('load', initBrowser);
+                window.addEventListener('load', loadPage);
             }
             
-            console.log('🚀 Cloud Browser initialized');
+            // Fix cho Safari
+            window.addEventListener('resize', function() {
+                const container = document.getElementById('container');
+                container.style.height = window.innerHeight + 'px';
+            });
+            
+            console.log('✅ Cloud Browser initialized');
         })();
     </script>
 </body>
