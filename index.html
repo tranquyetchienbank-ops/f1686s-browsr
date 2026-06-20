@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Cloud Browser</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #1a1a1a;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+
+        .browser-container {
+            width: 100%;
+            height: 100vh;
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            background: #ffffff;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .iframe-wrapper {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            background: #ffffff;
+        }
+
+        #browserFrame {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+            background: #ffffff;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            transition: opacity 0.5s ease;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #f5a623;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        .loading-text {
+            margin-top: 20px;
+            color: #333;
+            font-size: 16px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .browser-container {
+                height: 100vh;
+                height: 100dvh;
+            }
+        }
+
+        @supports (-webkit-touch-callout: none) {
+            .browser-container {
+                height: -webkit-fill-available;
+            }
+        }
+
+        ::-webkit-scrollbar {
+            display: none;
+        }
+        
+        * {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        /* Ẩn URL bar trên mobile */
+        iframe {
+            -webkit-overflow-scrolling: touch;
+        }
+    </style>
+</head>
+<body>
+    <div class="browser-container">
+        <div class="iframe-wrapper">
+            <iframe 
+                id="browserFrame"
+                sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-downloads"
+                allow="accelerometer; camera; encrypted-media; geolocation; gyroscope; microphone; fullscreen"
+                loading="lazy"
+                webkitallowfullscreen
+                mozallowfullscreen
+                allowfullscreen
+            ></iframe>
+            
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="spinner"></div>
+                <div class="loading-text">Đang tải trình duyệt...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            const TARGET_URL = 'https://f1686s.com';
+            const iframe = document.getElementById('browserFrame');
+            const loadingOverlay = document.getElementById('loadingOverlay');
+
+            // Inject Tampermonkey script vào iframe
+            function injectScriptToIframe() {
+                try {
+                    const scriptContent = document.querySelector('script[data-tampermonkey]');
+                    if (!scriptContent) return;
+
+                    const script = document.createElement('script');
+                    script.textContent = scriptContent.textContent;
+                    
+                    // Thử inject vào iframe
+                    try {
+                        const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                        if (iframeDoc && iframeDoc.head) {
+                            iframeDoc.head.appendChild(script);
+                            console.log('Tampermonkey script injected to iframe');
+                        }
+                    } catch (e) {
+                        console.log('Cannot inject to iframe directly, will inject via URL');
+                    }
+                } catch (e) {
+                    console.log('Script injection error:', e);
+                }
+            }
+
+            // Load Tampermonkey script
+            function loadTampermonkeyScript() {
+                return new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.setAttribute('data-tampermonkey', 'true');
+                    script.src = '/tampermonkey-script.js?' + Date.now();
+                    script.onload = () => {
+                        console.log('Tampermonkey script loaded');
+                        resolve();
+                    };
+                    script.onerror = () => {
+                        console.error('Failed to load Tampermonkey script');
+                        reject();
+                    };
+                    document.head.appendChild(script);
+                });
+            }
+
+            // Khởi tạo browser
+            function initBrowser() {
+                // Load script trước
+                loadTampermonkeyScript()
+                    .then(() => {
+                        // Inject vào iframe sau khi load
+                        setTimeout(injectScriptToIframe, 500);
+                        iframe.src = TARGET_URL;
+                    })
+                    .catch(() => {
+                        // Vẫn load trang nếu script lỗi
+                        iframe.src = TARGET_URL;
+                    });
+
+                // Xử lý load iframe
+                iframe.addEventListener('load', function() {
+                    loadingOverlay.classList.add('hidden');
+                    
+                    // Inject script vào iframe mỗi khi load
+                    setTimeout(injectScriptToIframe, 1000);
+                    setTimeout(injectScriptToIframe, 3000);
+                });
+
+                // Timeout ẩn loading
+                setTimeout(() => {
+                    loadingOverlay.classList.add('hidden');
+                }, 8000);
+            }
+
+            // Khởi tạo khi DOM ready
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initBrowser);
+            } else {
+                initBrowser();
+            }
+
+            // Fix cho Safari
+            window.addEventListener('load', function() {
+                if (navigator.userAgent.indexOf('Safari') !== -1 && 
+                    navigator.userAgent.indexOf('Chrome') === -1) {
+                    document.querySelector('.browser-container').style.height = '100vh';
+                    document.querySelector('.browser-container').style.height = '-webkit-fill-available';
+                }
+            });
+
+            // Handle resize
+            let resizeTimeout;
+            window.addEventListener('resize', function() {
+                clearTimeout(resizeTimeout);
+                resizeTimeout = setTimeout(() => {
+                    const container = document.querySelector('.browser-container');
+                    if (window.innerWidth < 768) {
+                        container.style.height = window.innerHeight + 'px';
+                    }
+                }, 100);
+            });
+
+            console.log('Cloud Browser initialized');
+        })();
+    </script>
+</body>
+</html>
